@@ -1,4 +1,6 @@
-# tugas_kelompok
+# InsightMind App
+
+created by Rivan Ghibran Baharudin Sulistya & Amarullah Arsadinata
 
 A new Flutter project.
 
