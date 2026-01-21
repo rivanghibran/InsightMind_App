@@ -1,51 +1,79 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+// Import domain & data
 import '../../domain/entities/question.dart';
+import '../../data/local/screening_record.dart'; // Model Hive
+
+// Import Providers
 import '../providers/questionnaire_provider.dart';
 import '../providers/score_provider.dart';
-import 'package:hive/hive.dart';
-import '../../data/local/screening_record.dart';
+import '../providers/history_providers.dart'; // Provider Repository
 
+// =============================================================
+// ===== HALAMAN 1: SCREENING PAGE (UI: Ungu + Hijau) =====
+// =============================================================
 class ScreeningPage extends ConsumerWidget {
   const ScreeningPage({super.key});
+
+  // Palet Warna
+  final Color bgPurple = const Color(0xFF6C5CE7);
+  final Color accentPink = const Color(0xFFFF7675);
+  final Color selectionGreen = const Color(0xFF81C784); // Hijau untuk jawaban
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final questions = ref.watch(questionsProvider);
     final qState = ref.watch(questionnaireProvider);
 
-    final progress =
-        questions.isEmpty ? 0.0 : (qState.answers.length / questions.length);
+    final progress = questions.isEmpty
+        ? 0.0
+        : (qState.answers.length / questions.length);
 
     return Scaffold(
+      backgroundColor: bgPurple,
       appBar: AppBar(
-        title: const Text('Screening InsightMind'),
+        title: const Text(
+          'Screening InsightMind',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
-        backgroundColor: Colors.indigo,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
-          // ===== PROGRESS BAR =====
+          // ===== PROGRESS SECTION =====
           Container(
-            color: Colors.indigo.shade50,
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            child: Row(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            child: Column(
               children: [
-                Expanded(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Progress",
+                      style: TextStyle(color: Colors.white.withOpacity(0.8)),
+                    ),
+                    Text(
+                      '${qState.answers.length} / ${questions.length}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
                   child: LinearProgressIndicator(
                     value: progress,
-                    backgroundColor: Colors.indigo.shade100,
-                    color: Colors.indigo,
-                    minHeight: 6,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '${qState.answers.length}/${questions.length}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.indigo,
+                    backgroundColor: Colors.black.withOpacity(0.2),
+                    color: accentPink,
+                    minHeight: 12,
                   ),
                 ),
               ],
@@ -54,100 +82,133 @@ class ScreeningPage extends ConsumerWidget {
 
           // ===== DAFTAR PERTANYAAN =====
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: questions.length,
-              separatorBuilder: (_, __) => const Divider(height: 24),
-              itemBuilder: (context, index) {
-                final q = questions[index];
-                final selected = qState.answers[q.id];
-                return _QuestionTile(
-                  index: index,
-                  question: q,
-                  selectedScore: selected,
-                  onSelected: (score) {
-                    ref
-                        .read(questionnaireProvider.notifier)
-                        .selectAnswer(questionId: q.id, score: score);
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.95),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(24),
+                  itemCount: questions.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 24),
+                  itemBuilder: (context, index) {
+                    final q = questions[index];
+                    final selected = qState.answers[q.id];
+                    return _QuestionTile(
+                      index: index,
+                      question: q,
+                      selectedScore: selected,
+                      accentColor: bgPurple,
+                      selectionColor: selectionGreen,
+                      onSelected: (score) {
+                        if (selected == score) {
+                          ref
+                              .read(questionnaireProvider.notifier)
+                              .removeAnswer(q.id);
+                        } else {
+                          ref
+                              .read(questionnaireProvider.notifier)
+                              .selectAnswer(questionId: q.id, score: score);
+                        }
+                      },
+                    );
                   },
-                );
-              },
+                ),
+              ),
             ),
           ),
         ],
       ),
 
-      // ===== TOMBOL LIHAT HASIL & RESET =====
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      // ===== TOMBOL LIHAT HASIL =====
+      bottomNavigationBar: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Tombol Lihat Hasil
-            FilledButton.icon(
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text(
-                'Lihat Hasil',
-                style: TextStyle(fontSize: 16, color: Colors.white),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.indigo,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              onPressed: () {
-                if (!qState.isComplete) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content:
-                          Text('Lengkapi semua pertanyaan sebelum melihat hasil.'),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (!qState.isComplete) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text(
+                          'Lengkapi semua pertanyaan sebelum melihat hasil.',
+                        ),
+                        backgroundColor: accentPink,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Tampilkan Popup Ringkasan
+                  showDialog(
+                    context: context,
+                    builder: (_) => _SummaryDialog(
+                      questions: questions,
+                      answers: qState.answers,
+                      bgPurple: bgPurple,
+                      accentPink: accentPink,
+                      onConfirm: () {
+                        // 1. Simpan jawaban ke state global untuk ResultPage
+                        final ordered = <int>[];
+                        for (final q in questions) {
+                          ordered.add(qState.answers[q.id]!);
+                        }
+                        ref.read(answersProvider.notifier).state = ordered;
+
+                        // 2. Navigasi ke Result Page
+                        Navigator.of(context).pop(); // Tutup dialog
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ResultPage()),
+                        );
+                      },
                     ),
                   );
-                  return;
-                }
-
-                // ==== tampilkan popup ringkasan sebelum ke halaman hasil ====
-                showDialog(
-                  context: context,
-                  builder: (_) => _SummaryDialog(
-                    questions: questions,
-                    answers: qState.answers,
-                    onConfirm: () {
-                      final ordered = <int>[];
-                      for (final q in questions) {
-                        ordered.add(qState.answers[q.id]!);
-                      }
-                      ref.read(answersProvider.notifier).state = ordered;
-
-                      Navigator.of(context).pop(); // tutup dialog
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ResultPage()),
-                      );
-                    },
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentPink,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 8),
-
-            // Tombol Reset Jawaban
-            OutlinedButton.icon(
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reset Jawaban'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.indigo,
-                side: const BorderSide(color: Colors.indigo),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                  elevation: 4,
+                  shadowColor: accentPink.withOpacity(0.4),
+                ),
+                child: const Text(
+                  'Lihat Hasil',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
-              onPressed: () {
-                ref.read(questionnaireProvider.notifier).reset();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Jawaban telah direset.'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                icon: Icon(Icons.refresh, color: bgPurple),
+                label: Text('Reset Jawaban', style: TextStyle(color: bgPurple)),
+                onPressed: () {
+                  ref.read(questionnaireProvider.notifier).reset();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Jawaban telah direset.'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -156,113 +217,257 @@ class ScreeningPage extends ConsumerWidget {
   }
 }
 
-// Result page: menampilkan hasil, daftar jawaban, dan opsi menyimpan ke riwayat
-class ResultPage extends ConsumerWidget {
-  const ResultPage({super.key});
+// =============================================================
+// ===== WIDGET: TILE PERTANYAAN =====
+// =============================================================
+class _QuestionTile extends StatelessWidget {
+  final int index;
+  final Question question;
+  final int? selectedScore;
+  final ValueChanged<int> onSelected;
+  final Color accentColor;
+  final Color selectionColor;
+
+  const _QuestionTile({
+    required this.index,
+    required this.question,
+    required this.selectedScore,
+    required this.onSelected,
+    required this.accentColor,
+    required this.selectionColor,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final answers = ref.watch(answersProvider);
-    final result = ref.watch(resultProvider);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hasil Screening'),
-        backgroundColor: Colors.indigo,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Card(
-              shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '${index + 1}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  question.text,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Column(
+          children: question.options.map((opt) {
+            final isSelected = selectedScore == opt.score;
+            return GestureDetector(
+              onTap: () => onSelected(opt.score),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? selectionColor : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected ? selectionColor : Colors.transparent,
+                    width: 2,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: selectionColor.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Row(
                   children: [
-                    const Icon(Icons.check_circle_outline,
-                        size: 64, color: Colors.indigo),
-                    const SizedBox(height: 12),
-                    Text('Skor: ${result.score}',
-                        style: const TextStyle(fontSize: 18)),
-                    const SizedBox(height: 6),
-                    Text('Level Risiko: ${result.level}',
-                        style: const TextStyle(
-                            fontSize: 16, color: Colors.indigo)),
-                    const SizedBox(height: 12),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('Jawaban:',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold)),
+                    Icon(
+                      isSelected
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      color: isSelected ? Colors.white : Colors.grey,
+                      size: 20,
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: answers.isEmpty
-                          ? [const Chip(label: Text('Tidak ada jawaban'))]
-                          : [for (final a in answers) Chip(label: Text('$a'))],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        opt.label,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black54,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            icon: const Icon(Icons.save),
-                            label: const Text('Simpan Riwayat'),
-                            style: FilledButton.styleFrom(
-                                backgroundColor: Colors.indigo),
-                            onPressed: answers.isEmpty
-                                ? null
-                                : () async {
-                                    // Simpan ke provider riwayat (menggunakan Hive di dalam provider)
-                                    ref.read(historyProvider.notifier).addRecord(
-                                          date: DateTime.now(),
-                                          answers: answers,
-                                          score: result.score,
-                                          level: result.level,
-                                        );
-
-                                    // Simpan juga ke box typed `screening_records` sebagai ScreeningRecord
-                                    try {
-                                      final box = Hive.box('screening_records');
-                                      // create simple record with generated id
-                                      final rec = ScreeningRecord(
-                                        id: DateTime.now()
-                                            .millisecondsSinceEpoch
-                                            .toString(),
-                                        timestamp: DateTime.now(),
-                                        score: result.score,
-                                        riskLevel: result.level,
-                                        note: answers.join(', '),
-                                      );
-                                      await box.add(rec);
-                                    } catch (_) {}
-
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text('Disimpan ke riwayat')),
-                                    );
-                                  },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.arrow_back),
-                            label: const Text('Kembali'),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                        ),
-                      ],
-                    )
                   ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================
+// ===== WIDGET: POPUP RINGKASAN =====
+// =============================================================
+class _SummaryDialog extends StatelessWidget {
+  final List<Question> questions;
+  final Map<String, int> answers;
+  final VoidCallback onConfirm;
+  final Color bgPurple;
+  final Color accentPink;
+
+  const _SummaryDialog({
+    required this.questions,
+    required this.answers,
+    required this.onConfirm,
+    required this.bgPurple,
+    required this.accentPink,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 550),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              decoration: BoxDecoration(
+                color: bgPurple,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Ringkasan Jawaban',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.all(24),
+                itemCount: questions.length,
+                separatorBuilder: (_, __) => const Divider(height: 24),
+                itemBuilder: (_, i) {
+                  final q = questions[i];
+                  final selectedScore = answers[q.id];
+                  final selectedLabel = q.options
+                      .firstWhere((opt) => opt.score == selectedScore)
+                      .label;
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${i + 1}.',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[400],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              q.text,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              selectedLabel,
+                              style: TextStyle(
+                                color: accentPink,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: onConfirm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: bgPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text('Simpan & Lihat Hasil'),
                 ),
               ),
             ),
@@ -274,156 +479,213 @@ class ResultPage extends ConsumerWidget {
 }
 
 // =============================================================
-// ===== Widget Pertanyaan (RadioListTile) =====
+// ===== HALAMAN 2: RESULT PAGE (Hive Integrated) =====
 // =============================================================
-class _QuestionTile extends StatelessWidget {
-  final int index;
-  final Question question;
-  final int? selectedScore;
-  final ValueChanged<int> onSelected;
-
-  const _QuestionTile({
-    required this.index,
-    required this.question,
-    required this.selectedScore,
-    required this.onSelected,
-  });
+class ResultPage extends ConsumerStatefulWidget {
+  const ResultPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${index + 1}. ${question.text}',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-        const SizedBox(height: 8),
-        Column(
-          children: [
-            for (final opt in question.options)
-              RadioListTile<int>(
-                title: Text(opt.label),
-                value: opt.score,
-                groupValue: selectedScore,
-                onChanged: (value) {
-                  if (value != null) onSelected(value);
-                },
-                activeColor: Colors.indigo,
-                contentPadding: EdgeInsets.zero,
-              ),
-          ],
-        ),
-      ],
-    );
-  }
+  ConsumerState<ResultPage> createState() => _ResultPageState();
 }
 
-// =============================================================
-// ===== POPUP RINGKASAN JAWABAN =====
-// =============================================================
-class _SummaryDialog extends StatelessWidget {
-  final List<Question> questions;
-  final Map<String, int> answers;
-  final VoidCallback onConfirm;
+class _ResultPageState extends ConsumerState<ResultPage> {
+  final Color bgPurple = const Color(0xFF6C5CE7);
+  final Color accentPink = const Color(0xFFFF7675);
+  final Color cardWhite = const Color(0xFFFFFFFF);
 
-  const _SummaryDialog({
-    required this.questions,
-    required this.answers,
-    required this.onConfirm,
-  });
+  // State untuk mencegah double save dan loading
+  bool _isSaving = false;
+  bool _hasSaved = false;
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: const EdgeInsets.all(16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 500),
+    final answers = ref.watch(answersProvider);
+    final result = ref.watch(resultProvider);
+
+    return Scaffold(
+      backgroundColor: bgPurple,
+      appBar: AppBar(
+        title: const Text(
+          'Hasil Screening',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // ===== Header =====
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: const BoxDecoration(
-                color: Colors.indigo,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              decoration: BoxDecoration(
+                color: cardWhite,
+                borderRadius: BorderRadius.circular(30),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              padding: const EdgeInsets.all(24),
+              child: Column(
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: bgPurple.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.psychology_alt,
+                      size: 50,
+                      color: bgPurple,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   const Text(
-                    'Ringkasan Jawaban',
+                    'SKOR ANDA',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Colors.grey,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-
-            // ===== Isi Ringkasan =====
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: questions.length,
-                itemBuilder: (_, i) {
-                  final q = questions[i];
-                  final selectedScore = answers[q.id];
-                  final selectedLabel = q.options
-                      .firstWhere((opt) => opt.score == selectedScore)
-                      .label;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${i + 1}. ${q.text}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Jawaban: $selectedLabel',
-                          style: const TextStyle(color: Colors.indigo),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            // ===== Tombol Tutup & Lanjut =====
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Tutup'),
+                  Text(
+                    '${result.score}',
+                    style: const TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: onConfirm,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.indigo,
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentPink,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Risiko ${result.level}', // Pastikan field ini sesuai (level/riskLevel)
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
-                      child: const Text('Lanjutkan'),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 16),
+
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Riwayat Jawaban:',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: answers.isEmpty
+                        ? [const Chip(label: Text('Tidak ada jawaban'))]
+                        : [
+                            for (int i = 0; i < answers.length; i++)
+                              Chip(
+                                label: Text('${i + 1}: ${answers[i]}'),
+                                backgroundColor: bgPurple.withOpacity(0.05),
+                                labelStyle: TextStyle(color: bgPurple),
+                              ),
+                          ],
+                  ),
+                  const SizedBox(height: 32),
+
+                  // ===== TOMBOL SIMPAN KE RIWAYAT (Fixed Hive Logic) =====
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.save),
+                      label: Text(
+                        _hasSaved ? 'Tersimpan' : 'Simpan ke Riwayat',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _hasSaved ? Colors.grey : bgPurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      // Disable jika sedang simpan atau sudah disimpan
+                      onPressed: (_isSaving || _hasSaved || answers.isEmpty)
+                          ? null
+                          : () async {
+                              setState(() => _isSaving = true);
+
+                              try {
+                                // 1. Panggil Repository (yang sudah pakai UUID & Hive)
+                                await ref
+                                    .read(historyRepositoryProvider)
+                                    .addRecord(
+                                      score: result.score,
+                                      riskLevel: result.level,
+                                      note: answers.join(', '),
+                                    );
+
+                                // 2. Refresh List Riwayat agar Dashboard update
+                                ref.invalidate(historyListProvider);
+
+                                if (context.mounted) {
+                                  setState(() {
+                                    _isSaving = false;
+                                    _hasSaved = true;
+                                  });
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        '✅ Berhasil disimpan ke Hive!',
+                                      ),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                setState(() => _isSaving = false);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Gagal menyimpan: $e'),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      child: const Text('Kembali ke Menu'),
+                      onPressed: () {
+                        // Kembali ke halaman utama (bersihkan stack)
+                        Navigator.of(
+                          context,
+                        ).popUntil((route) => route.isFirst);
+                      },
                     ),
                   ),
                 ],
