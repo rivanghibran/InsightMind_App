@@ -30,6 +30,13 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
     state = state.copyWith(answers: newMap);
   }
 
+  /// Menghapus jawaban (untuk fitur toggle/unselect)
+  void removeAnswer(String questionId) {
+    final newMap = Map<String, int>.from(state.answers);
+    newMap.remove(questionId); // Hapus key dari map
+    state = state.copyWith(answers: newMap);
+  }
+
   /// Reset semua jawaban
   void reset() {
     state = const QuestionnaireState();

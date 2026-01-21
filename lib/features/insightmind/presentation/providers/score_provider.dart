@@ -99,7 +99,7 @@ class HistoryNotifier extends StateNotifier<List<Map<String, dynamic>>> {
         // Data ditemukan di Hive, gunakan data tersebut
         state = stored.map<Map<String, dynamic>>((e) {
           if (e is Map) {
-            return Map<String, dynamic>.from(e as Map);
+            return Map<String, dynamic>.from(e);
           }
           return <String, dynamic>{};
         }).toList();
