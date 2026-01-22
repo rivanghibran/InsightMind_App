@@ -64,3 +64,4 @@ class HistoryRepository {
     await box.clear();
   }
 }
+

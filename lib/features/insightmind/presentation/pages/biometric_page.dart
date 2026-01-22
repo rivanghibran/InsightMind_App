@@ -1,6 +1,6 @@
-// WEEK6 + WEEK7: Integrasi Sensor → FeatureVector → AI
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:camera/camera.dart'; // Pastikan package camera sudah diinstal
 import 'package:tugas_kelompok/features/insightmind/data/models/feature_vector.dart';
 
 import '../providers/sensors_provider.dart';
@@ -195,6 +195,49 @@ class BiometricPage extends ConsumerWidget {
                     ),
                   ],
                 ),
+                
+                const SizedBox(height: 24),
+
+                // ============================================
+                // [BARU] PREVIEW KAMERA STATIC ROUNDED
+                // ============================================
+                Container(
+                  height: 200, // Tinggi statis
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.black87, // Background gelap jika kamera mati
+                    borderRadius: BorderRadius.circular(20), // Rounded corners
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  clipBehavior: Clip.hardEdge, // Memotong kamera agar rounded
+                  child: (ppg.controller != null && ppg.controller!.value.isInitialized)
+                      ? AspectRatio(
+                          aspectRatio: ppg.controller!.value.aspectRatio,
+                          child: CameraPreview(ppg.controller!),
+                        )
+                      : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.videocam_off_outlined, 
+                                color: Colors.white.withOpacity(0.4), 
+                                size: 48
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "Camera Not Found",
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.4),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+
                 const SizedBox(height: 24),
 
                 // Data Stats Grid
