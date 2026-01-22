@@ -1,8 +1,7 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-// Pastikan path import ini sesuai dengan lokasi file Anda yang sebenarnya
-import '../../data/local/history_repository.dart'; 
-import '../../data/local/screening_record.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // 1. Wajib Import Auth
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:uuid/uuid.dart';
+import 'screening_record.dart';
 
 /// 1. Provider untuk mengakses repository
 final historyRepositoryProvider = Provider<HistoryRepository>((ref) {
@@ -21,8 +20,6 @@ class HistoryListNotifier extends StateNotifier<AsyncValue<List<ScreeningRecord>
   // Fungsi ambil data dari Hive
   Future<void> loadData() async {
     try {
-      // Kita cukup panggil getAll(), karena Repository sekarang sudah pintar
-      // (Repository sudah otomatis filter berdasarkan UID user yang login)
       final data = await _repository.getAll();
       
       if (mounted) {
@@ -44,8 +41,8 @@ class HistoryListNotifier extends StateNotifier<AsyncValue<List<ScreeningRecord>
 }
 
 /// 3. Provider Utama (StateNotifierProvider)
-/// PERUBAHAN: Tambahkan .autoDispose di sini
-final historyListProvider = StateNotifierProvider.autoDispose<HistoryListNotifier, AsyncValue<List<ScreeningRecord>>>((ref) {
+/// Tipe ini MEMILIKI .notifier, sehingga error di ResultPage akan hilang
+final historyListProvider = StateNotifierProvider<HistoryListNotifier, AsyncValue<List<ScreeningRecord>>>((ref) {
   final repo = ref.watch(historyRepositoryProvider);
   return HistoryListNotifier(repo);
 });
