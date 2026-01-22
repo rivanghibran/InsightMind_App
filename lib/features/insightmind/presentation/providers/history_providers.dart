@@ -21,6 +21,8 @@ class HistoryListNotifier extends StateNotifier<AsyncValue<List<ScreeningRecord>
   // Fungsi ambil data dari Hive
   Future<void> loadData() async {
     try {
+      // Kita cukup panggil getAll(), karena Repository sekarang sudah pintar
+      // (Repository sudah otomatis filter berdasarkan UID user yang login)
       final data = await _repository.getAll();
       
       if (mounted) {
@@ -42,8 +44,8 @@ class HistoryListNotifier extends StateNotifier<AsyncValue<List<ScreeningRecord>
 }
 
 /// 3. Provider Utama (StateNotifierProvider)
-/// Tipe ini MEMILIKI .notifier, sehingga error di ResultPage akan hilang
-final historyListProvider = StateNotifierProvider<HistoryListNotifier, AsyncValue<List<ScreeningRecord>>>((ref) {
+/// PERUBAHAN: Tambahkan .autoDispose di sini
+final historyListProvider = StateNotifierProvider.autoDispose<HistoryListNotifier, AsyncValue<List<ScreeningRecord>>>((ref) {
   final repo = ref.watch(historyRepositoryProvider);
   return HistoryListNotifier(repo);
 });
