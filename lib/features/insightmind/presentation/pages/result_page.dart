@@ -1,8 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart'; // 1. Import Auth untuk ambil UID
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/score_provider.dart';
 import '../providers/history_providers.dart';
+import '../providers/questionnaire_provider.dart'; // PENTING: Untuk reset kuesioner
 
 // Extension untuk menentukan level risiko
 extension RiskResultExtensions on RiskResult {
@@ -42,22 +44,34 @@ class _ResultPageState extends ConsumerState<ResultPage> {
 
   Future<void> _saveDataToHive() async {
     final result = ref.read(resultProvider);
+    final answers = ref.read(answersProvider);
+
+    // 2. AMBIL USER ID DARI FIREBASE
+    // Ini penting agar data screening "tertempel" ke akun user tertentu
+    final user = FirebaseAuth.instance.currentUser;
+    final userId = user?.uid ?? "ANONYMOUS"; 
     
     try {
-      print("💾 START: Mencoba menyimpan Skor ${result.score} ke Hive...");
+      print("💾 START: Mencoba menyimpan Skor ${result.score} untuk User: $userId...");
 
-      // 1. Panggil Repository (Simpan ke DB)
+      // 3. Gabungkan UID dan Jawaban ke dalam catatan
+      // Format: "UID:[xxx] | JAWABAN:[1,0,2...]"
+      final noteContent = "UID:$userId | JAWABAN:${answers.join(', ')}";
+
+      // 4. Panggil Repository (Simpan ke DB Lokal Hive)
       await ref.read(historyRepositoryProvider).addRecord(
             score: result.score,
             riskLevel: result.riskLevel,
+            note: noteContent, // Simpan string gabungan tadi
           );
 
-      // 2. Refresh Provider agar halaman History mengambil data baru
-      ref.invalidate(historyListProvider);
+      // 5. Refresh Provider agar halaman History & Dashboard update otomatis
+      // Menggunakan .notifier karena historyListProvider adalah StateNotifierProvider
+      ref.read(historyListProvider.notifier).refresh();
 
       print("✅ SUCCESS: Data tersimpan!");
 
-      // 3. Update UI
+      // 6. Update UI
       if (mounted) {
         setState(() {
           _isSaving = false;
@@ -241,6 +255,8 @@ class _ResultPageState extends ConsumerState<ResultPage> {
                       onPressed: _isSaving 
                           ? null // Disable tombol saat loading
                           : () {
+                              // Reset state kuesioner sebelum kembali
+                              ref.read(questionnaireProvider.notifier).reset();
                               Navigator.of(context).popUntil((route) => route.isFirst);
                             },
                       style: ElevatedButton.styleFrom(

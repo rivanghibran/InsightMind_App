@@ -1,17 +1,19 @@
-// Dashboard Analytics InsightMind (Final Merged Version)
-// UI/UX: Purple Theme (Kode Lama) + Fitur: Report/Actions (Kode Baru)
-// Teknologi: Riverpod 2.x + Material 3 + CustomPainter
-
+import 'dart:io'; // Tambahan untuk operasi File
+import 'dart:typed_data'; // Tambahan untuk Uint8List
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart'; // Tambahan
+import 'package:share_plus/share_plus.dart'; // Tambahan
 import 'dart:math' as math;
 
-// Pastikan import ini sesuai dengan struktur project Anda
+// --- IMPORTS ---
+// Pastikan path ini sesuai dengan struktur folder project Anda
 import '../providers/history_providers.dart';
 import '../providers/report_provider.dart';
+import 'history_list_page.dart'; 
 
-// --- PALET WARNA (Khas Kode Lama) ---
+// --- PALET WARNA ---
 const Color _bgPurple = Color(0xFF6C5CE7);
 const Color _accentPink = Color(0xFFFF7675);
 const Color _cardWhite = Color(0xFFFFFFFF);
@@ -22,7 +24,7 @@ class DashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Mengambil data histori
+    // Mengambil data histori dari Provider
     final historyAsync = ref.watch(historyListProvider);
 
     return Scaffold(
@@ -57,12 +59,12 @@ class DashboardPage extends ConsumerWidget {
             return _EmptyState();
           }
 
-          // --- 1. KELOLA DATA UNTUK UI ---
+          // --- 1. LOGIKA STATISTIK ---
           final tinggi = records.where((r) => r.riskLevel == 'Tinggi').length;
           final sedang = records.where((r) => r.riskLevel == 'Sedang').length;
           final rendah = records.where((r) => r.riskLevel == 'Rendah').length;
 
-          // --- 2. INSIGHT LOGIC ---
+          // --- 2. LOGIKA INSIGHT ---
           String insight = 'Pertahankan pola hidup positif Anda!';
           if (tinggi > sedang && tinggi > rendah) {
             insight = 'Risiko tinggi terdeteksi. Pertimbangkan konsultasi profesional.';
@@ -77,7 +79,7 @@ class DashboardPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header Sapaan
+                // Header
                 const Text(
                   "Ringkasan",
                   style: TextStyle(
@@ -88,17 +90,17 @@ class DashboardPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
 
-                // --- 3. KOMPONEN VISUAL KODE LAMA (Gradient Card) ---
+                // Banner Insight Gradient
                 _InsightBanner(insight: insight),
                 
                 const SizedBox(height: 24),
 
-                // --- 4. KOMPONEN GRAFIK KODE LAMA (Sparkline) ---
+                // Grafik Sparkline
                 _SparklineCard(records: records),
 
                 const SizedBox(height: 24),
 
-                // --- 5. STATISTIK RISIKO (UI Kode Lama) ---
+                // Statistik Risiko
                 const Text(
                   "Statistik Risiko",
                   style: TextStyle(
@@ -141,12 +143,13 @@ class DashboardPage extends ConsumerWidget {
 
                 const SizedBox(height: 30),
 
-                // --- 6. INTEGRASI FITUR BARU (Tombol Aksi) ---
-                // Bagian ini mengambil fungsionalitas Kode Baru tapi
-                // distyling agar masuk ke Tema Ungu Kode Lama
+                // Divider Pemisah Area Aksi
                 const Divider(color: Colors.white24),
                 const SizedBox(height: 16),
+
+                // Area Tombol Aksi (History & PDF & Share)
                 _ActionButtonsArea(ref: ref, records: records),
+                
                 const SizedBox(height: 40),
               ],
             ),
@@ -158,10 +161,9 @@ class DashboardPage extends ConsumerWidget {
 }
 
 // =========================================================
-// WIDGET PENDUKUNG (UI components)
+// WIDGET AREA TOMBOL AKSI
 // =========================================================
 
-/// Area tombol aksi (History, PDF, Share) yang diadaptasi dari Kode Baru
 class _ActionButtonsArea extends StatelessWidget {
   final WidgetRef ref;
   final List records;
@@ -171,11 +173,30 @@ class _ActionButtonsArea extends StatelessWidget {
     required this.records,
   });
 
+  // --- Helper: Generate PDF Data ---
+  Future<Uint8List> _generatePdfData() async {
+    final generator = ref.read(reportGeneratorProvider);
+    
+    // Transform data agar sesuai format ReportGenerator
+    final historyData = records.map((r) {
+      return {
+        'tanggal': DateFormat('dd MMM yyyy').format(r.timestamp),
+        'score': r.score,
+        'riskLevel': r.riskLevel,
+      };
+    }).toList();
+
+    // FIXED: Menghapus parameter 'username' agar tidak error
+    return await generator.generateReport(
+      history: List<Map<String, dynamic>>.from(historyData),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Tombol History (Besar)
+        // Tombol History (Navigasi ke Halaman Baru)
         SizedBox(
           width: double.infinity,
           height: 50,
@@ -189,7 +210,12 @@ class _ActionButtonsArea extends StatelessWidget {
               elevation: 4,
             ),
             onPressed: () {
-              Navigator.pushNamed(context, '/history');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const HistoryListPage(),
+                ),
+              );
             },
             icon: const Icon(Icons.history_edu),
             label: const Text(
@@ -199,9 +225,11 @@ class _ActionButtonsArea extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        // Tombol PDF & Share (Baris)
+        
+        // Baris Tombol PDF & Share
         Row(
           children: [
+            // --- TOMBOL UNDUH PDF ---
             Expanded(
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
@@ -215,31 +243,29 @@ class _ActionButtonsArea extends StatelessWidget {
                 icon: const Icon(Icons.picture_as_pdf),
                 label: const Text('Unduh PDF'),
                 onPressed: () async {
-                  // --- LOGIC PDF DARI KODE BARU ---
-                  final generator = ref.read(reportGeneratorProvider);
-                  final previewer = ref.read(reportPreviewProvider);
+                  try {
+                    // Indikator Loading
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Membuka PDF...'), duration: Duration(milliseconds: 800)),
+                    );
 
-                  // Transform data untuk generator
-                  final historyData = records.map((r) {
-                    return {
-                      'tanggal': r.timestamp.toString().substring(0, 10),
-                      'score': r.score,
-                      'riskLevel': r.riskLevel,
-                    };
-                  }).toList();
+                    final pdfBytes = await _generatePdfData();
+                    final previewer = ref.read(reportPreviewProvider);
 
-                  final pdfBytes = await generator.generateReport(
-                    username: 'User InsightMind',
-                    history: historyData,
-                  );
-
-                  await previewer.previewPdf(
-                    onLayout: (_) async => pdfBytes,
-                  );
+                    await previewer.previewPdf(
+                      onLayout: (_) async => pdfBytes,
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Gagal membuka PDF: $e")),
+                    );
+                  }
                 },
               ),
             ),
             const SizedBox(width: 12),
+            
+            // --- TOMBOL SHARE (LOGIKA BARU) ---
             Expanded(
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
@@ -252,11 +278,39 @@ class _ActionButtonsArea extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.share),
                 label: const Text('Bagikan'),
-                onPressed: () {
-                  // Implementasi Share
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Fitur Share ditekan')),
-                  );
+                onPressed: () async {
+                  try {
+                    // 1. Tampilkan loading
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Menyiapkan file untuk dibagikan...'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+
+                    // 2. Generate PDF Bytes
+                    final pdfBytes = await _generatePdfData();
+
+                    // 3. Simpan File Sementara di Cache HP
+                    final tempDir = await getTemporaryDirectory();
+                    final timeStamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+                    final fileName = 'Laporan_InsightMind_$timeStamp.pdf';
+                    final file = File('${tempDir.path}/$fileName');
+                    
+                    await file.writeAsBytes(pdfBytes, flush: true);
+
+                    // 4. Panggil Native Share (WA, Telegram, Email, dll)
+                    await Share.shareXFiles(
+                      [XFile(file.path)],
+                      text: 'Halo, ini hasil laporan kesehatan mental saya dari aplikasi InsightMind.',
+                      subject: 'Laporan Kesehatan Mental - InsightMind App', // Subject untuk email
+                    );
+
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Gagal membagikan: $e")),
+                    );
+                  }
                 },
               ),
             ),
@@ -267,7 +321,10 @@ class _ActionButtonsArea extends StatelessWidget {
   }
 }
 
-/// Widget Insight Gradient (Visual Kode Lama)
+// =========================================================
+// WIDGET UI LAINNYA
+// =========================================================
+
 class _InsightBanner extends StatelessWidget {
   final String insight;
   const _InsightBanner({required this.insight});
@@ -318,8 +375,7 @@ class _InsightBanner extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   insight,
-                  style:
-                      TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13),
+                  style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13),
                 ),
               ],
             ),
@@ -330,7 +386,6 @@ class _InsightBanner extends StatelessWidget {
   }
 }
 
-/// Card Visual untuk Statistik Risiko
 class _RiskCard extends StatelessWidget {
   final String label;
   final int count;
@@ -386,7 +441,6 @@ class _RiskCard extends StatelessWidget {
   }
 }
 
-/// Widget Empty State (Visual Kode Lama)
 class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -419,8 +473,9 @@ class _EmptyState extends StatelessWidget {
             style: TextStyle(color: Colors.white70, height: 1.5),
           ),
           const SizedBox(height: 24),
-           ElevatedButton.icon(
-             style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: _bgPurple),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white, foregroundColor: _bgPurple),
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.arrow_back),
             label: const Text('Kembali ke Home'),
@@ -432,7 +487,7 @@ class _EmptyState extends StatelessWidget {
 }
 
 // =========================================================
-// LOGIC SPARKLINE CHART (Visual Kode Lama)
+// LOGIC SPARKLINE CHART
 // =========================================================
 
 class _SparklineCard extends StatefulWidget {
@@ -475,7 +530,6 @@ class _SparklineCardState extends State<_SparklineCard>
         .toList();
     if (values.isEmpty) return null;
 
-    // Perhitungan lebar chart dikurangi padding (24 kiri + 24 kanan = 48)
     final chartWidth = MediaQuery.of(context).size.width - 48;
     final dx = chartWidth / math.max(1, values.length - 1);
 
@@ -611,7 +665,7 @@ class _SparklineCardState extends State<_SparklineCard>
             ),
           ),
           const SizedBox(height: 16),
-          // Tanggal
+          // Tanggal Awal & Akhir
           if (widget.records.isNotEmpty)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -675,9 +729,7 @@ class _SparklinePainter extends CustomPainter {
       min -= 5;
     }
     final range = max - min;
-    
-    // Perbaikan padding bawah
-    final bottomPadding = 10.0; 
+    final bottomPadding = 10.0;
 
     final dx = size.width / math.max(1, values.length - 1);
     final maxIndex = (values.length * animationProgress).ceil();
@@ -688,8 +740,8 @@ class _SparklinePainter extends CustomPainter {
       if (i > maxIndex) break;
       final x = dx * i;
       final normalizedY = (values[i] - min) / range;
-      // Adjust Height calculation
-      final y = (size.height - bottomPadding) - (normalizedY * (size.height - bottomPadding));
+      final y = (size.height - bottomPadding) -
+          (normalizedY * (size.height - bottomPadding));
 
       if (i == 0) {
         path.moveTo(x, y);
@@ -699,8 +751,7 @@ class _SparklinePainter extends CustomPainter {
     }
 
     final fillPath = Path.from(path)
-      ..lineTo(
-          math.min(size.width, dx * (maxIndex - 1).clamp(0, values.length)),
+      ..lineTo(math.min(size.width, dx * (maxIndex - 1).clamp(0, values.length)),
           size.height)
       ..lineTo(0, size.height)
       ..close();
@@ -712,16 +763,12 @@ class _SparklinePainter extends CustomPainter {
     for (int i = 0; i <= maxIndex && i < values.length; i++) {
       final x = dx * i;
       final normalizedY = (values[i] - min) / range;
-      final y = (size.height - bottomPadding) - (normalizedY * (size.height - bottomPadding));
+      final y = (size.height - bottomPadding) -
+          (normalizedY * (size.height - bottomPadding));
 
       canvas.drawCircle(Offset(x, y), 4, Paint()..color = Colors.white);
-      canvas.drawCircle(
-          Offset(x, y),
-          4,
-          Paint()
-            ..color = color
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2);
+      canvas.drawCircle(Offset(x, y), 4,
+          Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 2);
 
       if (hoveredPoint != null &&
           (Offset(x, y) - hoveredPoint!).distance < 30) {

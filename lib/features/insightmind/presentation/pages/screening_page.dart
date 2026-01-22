@@ -566,7 +566,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      'Risiko ${result.level}', // Pastikan field ini sesuai (level/riskLevel)
+                      'Risiko ${result.level}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -582,8 +582,8 @@ class _ResultPageState extends ConsumerState<ResultPage> {
                     child: Text(
                       'Riwayat Jawaban:',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -603,7 +603,7 @@ class _ResultPageState extends ConsumerState<ResultPage> {
                   ),
                   const SizedBox(height: 32),
 
-                  // ===== TOMBOL SIMPAN KE RIWAYAT (Fixed Hive Logic) =====
+                  // ===== TOMBOL SIMPAN KE RIWAYAT =====
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -628,14 +628,13 @@ class _ResultPageState extends ConsumerState<ResultPage> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      // Disable jika sedang simpan atau sudah disimpan
                       onPressed: (_isSaving || _hasSaved || answers.isEmpty)
                           ? null
                           : () async {
                               setState(() => _isSaving = true);
 
                               try {
-                                // 1. Panggil Repository (yang sudah pakai UUID & Hive)
+                                // 1. Simpan ke Hive (Tidak terpengaruh reset di bawah)
                                 await ref
                                     .read(historyRepositoryProvider)
                                     .addRecord(
@@ -676,11 +675,18 @@ class _ResultPageState extends ConsumerState<ResultPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  
+                  // ===== TOMBOL KEMBALI (DENGAN RESET) =====
                   SizedBox(
                     width: double.infinity,
                     child: TextButton(
                       child: const Text('Kembali ke Menu'),
                       onPressed: () {
+                        // [MODIFIKASI] Reset state kuesioner sebelum kembali
+                        // Ini hanya membersihkan state di RAM (ScreeningPage)
+                        // Data yang sudah disimpan ke Hive di tombol "Simpan" aman.
+                        ref.read(questionnaireProvider.notifier).reset();
+
                         // Kembali ke halaman utama (bersihkan stack)
                         Navigator.of(
                           context,
